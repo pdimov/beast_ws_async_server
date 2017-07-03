@@ -1,0 +1,146 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />  
+<title>WebSocket Test</title>  
+<script language="javascript" type="text/javascript">
+
+function writeToScreen( message ) {
+
+    var div = document.createElement('div');
+    div.innerHTML = message;
+
+    var output = document.getElementById('output');
+
+    output.appendChild( div );
+    output.scrollTop = output.scrollHeight;
+};
+
+function dec2hex( i ) {
+    return (i+0x1000000).toString(16).substr(-6).toUpperCase();
+}
+
+function message_to_string( buffer ) {
+
+    if( typeof buffer == 'string' ) {
+        return '"' + buffer + '"';
+    }
+
+    var n = buffer.byteLength;
+    
+    if( n > 4096 ) {
+        return n + ' [ ... ]';
+    }
+
+    var v = new Uint32Array( buffer );
+    var s = buffer.byteLength + ' [';
+
+    var i = 0;
+
+    for( i = 0; i < v.length; ++i ) {
+        s += dec2hex( v[i] ) + ', ';
+    }
+
+    return s + ']';
+}
+
+var websocket;
+
+function send( msg ) {
+
+    writeToScreen( 'SENT: ' + message_to_string( msg ) );
+    websocket.send( msg );
+}
+
+var cid = 0xA3B5F;
+var seq = 0;
+
+var challenge = [ 0, 0 ];
+
+function send_command( code ) {
+
+    var msg = new ArrayBuffer( 16 );
+    var v = new Int32Array( msg );
+
+    v[0] = cid; // cid
+    v[1] = ++seq;
+    v[2] = code; // code
+    v[3] = 0; // length
+
+    send( msg );
+}
+
+function response_challenge( msg ) {
+
+    challenge = [ msg[ 4 ], msg[ 5 ] ];
+    writeToScreen( '<span style="color: blue;">response_challenge: ' + challenge + '</span>' );
+}
+
+function response_error( str, msg ) {
+
+    writeToScreen( '<span style="color: blue;">' + str + ': client code ' + dec2hex( msg[ 4 ] ) + '</span>' );
+}
+
+function parse_response( msg ) {
+
+    switch( msg[ 2 ] ) {
+    case 0x2700:
+
+        response_challenge( msg );
+        break;
+
+    case -1:
+
+        response_error( "response_unknown_packet", msg );
+        break;
+    }
+}
+
+function connect() {
+
+    websocket = new WebSocket( 'ws://localhost:6502' );
+
+    websocket.binaryType = "arraybuffer";
+
+    websocket.onopen = function( ev ) {
+        writeToScreen( 'CONNECTED' );
+    };
+
+    websocket.onclose = function( ev ) {
+        writeToScreen('DISCONNECTED');
+    };
+
+    websocket.onmessage = function( ev ) {
+        var msg = ev.data;
+        writeToScreen( '<span style="color: blue;">RESPONSE: ' + message_to_string( msg ) + ' </span>' );
+
+        if( typeof msg != 'string' ) {
+            parse_response( new Int32Array( msg ) );
+        }
+    };
+
+    websocket.onerror = function( ev ) {
+        writeToScreen( '<span style="color: red; ">ERROR: ' + ev.data + '</span>' );
+    };
+}
+
+function disconnect() {
+    websocket.close();
+}
+
+</script>  
+</head>
+
+<body>
+<h2>WebSocket Test</h2>
+
+  <p>
+    <button onclick="connect();">Connect</button>
+    <button onclick="send_command(0x2700);">cmd_get_challenge</button>
+    <button onclick="disconnect();">Disconnect</button>
+  </p>
+
+  <div id="output" style="border: #111 1px solid; width: 48em; height: 16em; overflow-y: scroll;"></div>
+
+</body>
+</html>
