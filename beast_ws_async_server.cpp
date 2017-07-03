@@ -36,6 +36,8 @@ private:
     int id_ = ++next_id_;
 
     websocket::stream<tcp::socket> ws_;
+    tcp::endpoint ep_;
+
     beast::flat_buffer buffer_;
 
     std::shared_ptr<session> ps_;
@@ -53,7 +55,7 @@ private:
     {
         std::ostringstream os;
 
-        os << "[#" << id_ << ' ' << ws_.next_layer().remote_endpoint() << "] " << a1 << std::endl;
+        os << "[#" << id_ << ' ' << ep_ << "] " << a1 << std::endl;
 
         log_( os.str() );
     }
@@ -62,14 +64,14 @@ private:
     {
         std::ostringstream os;
 
-        os << "[#" << id_ << ' ' << ws_.next_layer().remote_endpoint() << "] " << a1 << ' ' << a2 << std::endl;
+        os << "[#" << id_ << ' ' << ep_ << "] " << a1 << ' ' << a2 << std::endl;
 
         log_( os.str() );
     }
 
 public:
 
-    explicit connection( tcp::socket&& socket ): ws_( std::move(socket) ), ps_( std::make_shared<session>( id_, ws_.next_layer().remote_endpoint() ) )
+    explicit connection( tcp::socket&& socket ): ws_( std::move(socket) ), ep_( ws_.next_layer().remote_endpoint() ), ps_( std::make_shared<session>( id_, ep_ ) )
     {
         log( "Connected" );
     }
@@ -113,7 +115,11 @@ private:
 
     void on_read( beast::error_code ec )
     {
-        if( ec )
+        if( ec == websocket::error::closed )
+        {
+            log( "Connection closed" );
+        }
+        else if( ec )
         {
             log( "Read error:", ec.message() );
         }
