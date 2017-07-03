@@ -93,19 +93,12 @@ public:
 
         ws_.binary( true );
 
-        ws_.async_accept_ex(
-
-            // decorator
-            [](beast::websocket::response_type& res) { res.insert(http::field::server, BEAST_VERSION_STRING); },
-
-            // completion handler
-            [self = shared_from_this()](auto ec){ self->on_accept_ex( ec ); }
-        );
+        ws_.async_accept( [self = shared_from_this()](auto ec){ self->on_accept( ec ); } );
     }
 
 private:
 
-    void on_accept_ex( beast::error_code ec )
+    void on_accept( beast::error_code ec )
     {
         if( ec )
         {
